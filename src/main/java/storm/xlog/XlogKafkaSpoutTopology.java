@@ -279,6 +279,7 @@ public  class XlogKafkaSpoutTopology {
 	        }
 
 		if ( ( mm - start_mm > 0  && re_time - start_datetime >  intervalTime ) || (  mm - start_mm < 0 && re_time - start_datetime >  intervalTime ) ) {
+			System.out.println(line);
 			System.out.println(topic + " totals -> "+ total +" # ip totals ->" + hashIp.size() + " # whitelist totals ->" + ipWhitelist.size());
 		        String data = "";
 			ArrayList ipList = new ArrayList();
@@ -298,7 +299,6 @@ public  class XlogKafkaSpoutTopology {
 				value   = null;
 				hashUrl = null;
 					
-		            //System.out.println(l.get(i).getKey() + " -> " + l.get(i).getValue());
 		        }
                         data = StringUtils.join(ipList.toArray(), "), ("); 
 			try {
@@ -306,7 +306,7 @@ public  class XlogKafkaSpoutTopology {
 			 	Connection conn = DriverManager.getConnection(mysqlUrl, mysqlUser, mysqlPassword);
 			 	Statement stmt = conn.createStatement();//创建语句对象，用以执行sql语言
 			 	if ( valid > 0) {
-					String sql = "INSERT INTO  `storm`.`ips` (`topic`,`ip` ,`time_start` ,`time_end` ,`total` ,`statics` ,`dynamics` ,`2xx` ,`3xx` ,`4xx` ,`5xx` ,`get` ,`post` ,`head` ,`other`, `scope`) VALUES (" + data + ");";
+					String sql = "INSERT INTO  `ips` (`topic`,`ip` ,`time_start` ,`time_end` ,`total` ,`statics` ,`dynamics` ,`2xx` ,`3xx` ,`4xx` ,`5xx` ,`get` ,`post` ,`head` ,`other`, `scope`) VALUES (" + data + ");";
 		            		//System.out.println(sql);
 			 		stmt.execute(sql);
 					data = "";
@@ -339,8 +339,8 @@ public  class XlogKafkaSpoutTopology {
         SpoutConfig kafkaConfig = new SpoutConfig(brokerHosts, topic, "", "xlog_storm_"+topic);
         kafkaConfig.scheme = new SchemeAsMultiScheme(new StringScheme());
         TopologyBuilder builder = new TopologyBuilder();
-        builder.setSpout("KafkaSpout", new KafkaSpout(kafkaConfig), 2);
-        builder.setBolt("XlogBolt", new XlogBolt(), 2).setNumTasks(4).shuffleGrouping("KafkaSpout");
+        builder.setSpout("KafkaSpout", new KafkaSpout(kafkaConfig));
+        builder.setBolt("XlogBolt", new XlogBolt()).shuffleGrouping("KafkaSpout");
         return builder.createTopology();
     }
 
@@ -372,8 +372,8 @@ public  class XlogKafkaSpoutTopology {
         config.put(Config.TOPOLOGY_TRIDENT_BATCH_EMIT_INTERVAL_MILLIS, 50);
 	XlogKafkaSpoutTopology XlogkafkaSpoutTopology = new XlogKafkaSpoutTopology(kafkaZk);
         StormTopology stormTopology = XlogkafkaSpoutTopology.buildTopology(topic);
-        config.setNumWorkers(2);
-        config.setMaxTaskParallelism(2);
+        config.setNumWorkers(1);
+        config.setMaxTaskParallelism(1);
         config.setMaxSpoutPending(10000);
         config.put(Config.NIMBUS_HOST, nimbusIp);
         config.put(Config.NIMBUS_THRIFT_PORT, 6627);
