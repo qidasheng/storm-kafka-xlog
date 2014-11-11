@@ -42,6 +42,8 @@ import java.text.ParseException;
 import java.util.Vector;
 import java.util.Properties;
 
+import java.lang.Long.*;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -70,9 +72,9 @@ public  class XlogKafkaSpoutTopology {
 	HashMap<String, Integer> ipWhitelist = new HashMap<String, Integer>(); 
 	public void  prepare(Map stormConf, TopologyContext context) {
    		topic = (String) stormConf.get("xlog.kafka.topic.name");
-   		totalThreshold = (Long) stormConf.get("insert.into.mysql.min.total");
-   		scopeThreshold = (Long) stormConf.get("insert.into.mysql.min.scope");
-   	        intervalTime   = (Long) stormConf.get("xlog.interval.time");
+   		totalThreshold = Long.parseLong((String) stormConf.get("insert.into.mysql.min.total"), 10);
+   		scopeThreshold = Long.parseLong((String) stormConf.get("insert.into.mysql.max.scope"), 10);
+   	        intervalTime   = Long.parseLong((String) stormConf.get("xlog.interval.time"), 10);
    		mysqlUrl       = (String) stormConf.get("mysql.url");
    		mysqlUser      = (String) stormConf.get("mysql.user");
    		mysqlPassword  = (String) stormConf.get("mysql.password");
@@ -365,7 +367,8 @@ public  class XlogKafkaSpoutTopology {
         String kafkaZk = (String) config.get("xlog.zookeeper.server");
         String nimbusIp = (String) config.get("xlog.nimbus.host");
 	String topic = (String) config.get("xlog.kafka.topic.name");
-        config.put(Config.TOPOLOGY_DEBUG, true);
+	String debug = (String) config.get("xlog.debug");
+        config.put(Config.TOPOLOGY_DEBUG, debug.toLowerCase().equals("true") ? true : false);
         config.put(Config.TOPOLOGY_TRIDENT_BATCH_EMIT_INTERVAL_MILLIS, 50);
 	XlogKafkaSpoutTopology XlogkafkaSpoutTopology = new XlogKafkaSpoutTopology(kafkaZk);
         StormTopology stormTopology = XlogkafkaSpoutTopology.buildTopology(topic);
