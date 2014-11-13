@@ -10,6 +10,11 @@ import backtype.storm.topology.BasicOutputCollector;
 import backtype.storm.topology.OutputFieldsDeclarer;
 import backtype.storm.topology.TopologyBuilder;
 import backtype.storm.topology.base.BaseBasicBolt;
+import backtype.storm.topology.IRichBolt;
+
+import backtype.storm.tuple.Fields;
+import backtype.storm.tuple.Tuple;
+import backtype.storm.tuple.Values;
 
 import backtype.storm.task.TopologyContext;
 import backtype.storm.task.OutputCollector;
@@ -53,6 +58,28 @@ import org.apache.commons.lang.StringUtils;
 
 public  class XlogKafkaSpoutTopology {
     public static final Logger LOG = LoggerFactory.getLogger(XlogKafkaSpoutTopology.class);
+    public static class SplitSentence extends  BaseBasicBolt {
+                private int thisTaskId = 0;
+                public void  prepare(Map stormConf, TopologyContext context) {
+                        thisTaskId = context.getThisTaskId();
+
+                }
+
+                public void execute(Tuple tuple, BasicOutputCollector collector) {
+                        String line = tuple.getString(0);
+                        String[] lineArr = StringUtils.split(line.substring(0, 20), " ");
+                        //System.out.println(lineArr[0]);
+                        collector.emit(new Values(lineArr[0], line));
+                }
+
+                public void cleanup() {
+
+                }
+
+                public void declareOutputFields(OutputFieldsDeclarer declarer) {
+                        declarer.declare(new Fields("ip", "line"));
+                }
+   }
 
 
     public static class XlogBolt extends BaseBasicBolt {
@@ -67,6 +94,7 @@ public  class XlogKafkaSpoutTopology {
 	private int start_datetime = 0;
 	private int start_mm = 0;
 	private int total = 0,statics = 0, dynamics = 0;
+        private int thisTaskId = 0;
 	Hashtable<String, Object> hashIp = new Hashtable<String, Object>(1000, 0.5F);
         Hashtable<String, Object> hashIpUrl = new Hashtable<String, Object>(1000, 0.5F);
 	HashMap<String, Integer> ipWhitelist = new HashMap<String, Integer>(); 
@@ -78,6 +106,7 @@ public  class XlogKafkaSpoutTopology {
    		mysqlUrl       = (String) stormConf.get("mysql.url");
    		mysqlUser      = (String) stormConf.get("mysql.user");
    		mysqlPassword  = (String) stormConf.get("mysql.password");
+		thisTaskId = context.getThisTaskId();
 	}
 
         @Override
@@ -86,7 +115,7 @@ public  class XlogKafkaSpoutTopology {
 
         @Override
         public void execute(Tuple tuple, BasicOutputCollector collector) {
-		String line = tuple.getString(0);
+		String line = tuple.getString(1);
 		String regex = "([0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3})\\s(.+)\\s\\-\\s\\[(.+)\\s\\+0800\\]\\s\"(.+)\\s(.+)\\s(.+)\"\\s(\\d+)\\s(\\d+)\\s\"(.+)\"\\s\"(.+)\"\\s\"(.+)\"\\s(\\d+\\.\\d+|\\d+|\\-)\\s(\\d+\\.\\d+|\\d+|\\-)";
 		String ip = "";  
 		String host = "-";
@@ -279,8 +308,8 @@ public  class XlogKafkaSpoutTopology {
 	        }
 
 		if ( ( mm - start_mm > 0  && re_time - start_datetime >  intervalTime ) || (  mm - start_mm < 0 && re_time - start_datetime >  intervalTime ) ) {
-			System.out.println(line);
-			System.out.println(topic + " totals -> "+ total +" # ip totals ->" + hashIp.size() + " # whitelist totals ->" + ipWhitelist.size());
+			System.out.println("TaskId: " +thisTaskId + " -> " + line);
+			System.out.println("TaskId: " +thisTaskId + " # topic -> " + topic + " totals -> "+ total +" # ip totals ->" + hashIp.size() + " # whitelist totals ->" + ipWhitelist.size());
 		        String data = "";
 			ArrayList ipList = new ArrayList();
 			long totalIp = 0;
@@ -324,6 +353,7 @@ public  class XlogKafkaSpoutTopology {
                         isStatic = true;
                         start_datetime = 0;
                         start_mm = 0;
+
 		}
         }
 
@@ -339,8 +369,9 @@ public  class XlogKafkaSpoutTopology {
         SpoutConfig kafkaConfig = new SpoutConfig(brokerHosts, topic, "", "xlog_storm_"+topic);
         kafkaConfig.scheme = new SchemeAsMultiScheme(new StringScheme());
         TopologyBuilder builder = new TopologyBuilder();
-        builder.setSpout("KafkaSpout", new KafkaSpout(kafkaConfig));
-        builder.setBolt("XlogBolt", new XlogBolt()).shuffleGrouping("KafkaSpout");
+        builder.setSpout("KafkaSpout", new KafkaSpout(kafkaConfig)).setNumTasks(10);
+        builder.setBolt("SplitBolt", new SplitSentence()).setNumTasks(10).shuffleGrouping("KafkaSpout");
+        builder.setBolt("XlogBolt", new XlogBolt()).setNumTasks(10).fieldsGrouping("SplitBolt", new Fields("ip"));
         return builder.createTopology();
     }
 
@@ -370,15 +401,15 @@ public  class XlogKafkaSpoutTopology {
 	String debug = (String) config.get("xlog.debug");
         config.put(Config.TOPOLOGY_DEBUG, debug.toLowerCase().equals("true") ? true : false);
         config.put(Config.TOPOLOGY_TRIDENT_BATCH_EMIT_INTERVAL_MILLIS, 50);
-	XlogKafkaSpoutTopology XlogkafkaSpoutTopology = new XlogKafkaSpoutTopology(kafkaZk);
-        StormTopology stormTopology = XlogkafkaSpoutTopology.buildTopology(topic);
         config.setNumWorkers(1);
-        config.setMaxTaskParallelism(1);
+        config.setMaxTaskParallelism(10);
         config.setMaxSpoutPending(10000);
         config.put(Config.NIMBUS_HOST, nimbusIp);
         config.put(Config.NIMBUS_THRIFT_PORT, 6627);
         config.put(Config.STORM_ZOOKEEPER_PORT, 2181);
         config.put(Config.STORM_ZOOKEEPER_SERVERS, Arrays.asList(kafkaZk));
+	XlogKafkaSpoutTopology XlogkafkaSpoutTopology = new XlogKafkaSpoutTopology(kafkaZk);
+        StormTopology stormTopology = XlogkafkaSpoutTopology.buildTopology(topic);
         StormSubmitter.submitTopology(topic, config, stormTopology);
     }
 }
