@@ -346,7 +346,7 @@ public  class XlogKafkaSpoutTopology {
 
     public static void main(String[] args) throws Exception {
         if ( args == null || args.length != 1 ) {
-		System.out.println("Usage:storm jar target/storm-xlog-***-jar-with-dependencies.jar  storm.xlog.XlogKafkaSpoutTopology configure_file_path");
+		System.out.println("Usage:storm jar target/storm-xlog-****-jar-with-dependencies.jar  storm.xlog.XlogKafkaSpoutTopology configure_file_path");
 		System.exit(0);
 	}
         File file = new File(args[0]);
