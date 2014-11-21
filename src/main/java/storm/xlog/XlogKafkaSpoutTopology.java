@@ -366,12 +366,12 @@ public  class XlogKafkaSpoutTopology {
     }
 
     public StormTopology buildTopology(String topic) {
-        SpoutConfig kafkaConfig = new SpoutConfig(brokerHosts, topic, "", "xlog_storm_"+topic);
+        SpoutConfig kafkaConfig = new SpoutConfig(brokerHosts, topic, "", "xlog_"+topic);
         kafkaConfig.scheme = new SchemeAsMultiScheme(new StringScheme());
         TopologyBuilder builder = new TopologyBuilder();
-        builder.setSpout("KafkaSpout", new KafkaSpout(kafkaConfig)).setNumTasks(10);
-        builder.setBolt("SplitBolt", new SplitSentence()).setNumTasks(10).shuffleGrouping("KafkaSpout");
-        builder.setBolt("XlogBolt", new XlogBolt()).setNumTasks(10).fieldsGrouping("SplitBolt", new Fields("ip"));
+        builder.setSpout("KafkaSpout", new KafkaSpout(kafkaConfig), 2).setNumTasks(10);
+        builder.setBolt("SplitBolt", new SplitSentence(), 1).setNumTasks(10).shuffleGrouping("KafkaSpout");
+        builder.setBolt("XlogBolt", new XlogBolt(), 4).setNumTasks(10).fieldsGrouping("SplitBolt", new Fields("ip"));
         return builder.createTopology();
     }
 
