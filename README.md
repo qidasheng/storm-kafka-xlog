@@ -7,7 +7,7 @@ storm-kafka-xlog
 编译
 --------
 ```Bash
-mvn clean   
+mvn clean package 
 ```
 
 
