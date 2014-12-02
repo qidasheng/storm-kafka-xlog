@@ -11,10 +11,10 @@ mvn clean
 ```
 
 
-包路径    
+生成包路径    
 --------
 ```Bash
-target/storm-xlog-2.0.0-jar-with-dependencies.jar  
+target/storm-xlog-version-jar-with-dependencies.jar  
 ```
 
 创建数据库       
