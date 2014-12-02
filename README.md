@@ -6,16 +6,16 @@ storm-kafka-xlog
 
 编译
 --------
-···Bash
+```Bash
 mvn clean   
-···
+```
 
 
 包路径    
 --------
-···Bash
+```Bash
 target/storm-xlog-2.0.0-jar-with-dependencies.jar  
-···
+```
 
 创建数据库       
 --------
@@ -24,7 +24,7 @@ target/storm-xlog-2.0.0-jar-with-dependencies.jar
 
 配置    
 --------
-···Vim
+```Bash
 \#zookeeper.server地址，多个逗号分隔          
 xlog.zookeeper.server=10.19.1.16,10.19.1.17     
 \#storm nimbus host        
@@ -49,12 +49,12 @@ xlog.sqlxss.string=select ,alert(,prompt(,select(,sleep(,<script,_wvs
 xlog.sqlxss.enable=false   
 \#是否开启storm的debug功能      
 xlog.debug=false     
-···
+```
 
 
 部署：提交任务到单机storm或者storm集群    
 --------
-···Bash
+```Bash
 storm jar target/storm-xlog-version-jar-with-dependencies.jar  storm.xlog.XlogKafkaSpoutTopology xlog.properties   
-···
+```
 
