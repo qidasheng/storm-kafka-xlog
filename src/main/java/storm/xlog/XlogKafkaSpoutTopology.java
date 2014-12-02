@@ -54,6 +54,9 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
+import java.net.URLEncoder;
+import java.net.URLDecoder;
+
 import org.apache.commons.lang.StringUtils;
 
 public  class XlogKafkaSpoutTopology {
@@ -95,9 +98,36 @@ public  class XlogKafkaSpoutTopology {
 	private int start_mm = 0;
 	private int total = 0,statics = 0, dynamics = 0;
         private int thisTaskId = 0;
+	private String[] subcharArr;
+	private	String[] substrArr;
+	private	boolean sqlxssEnable = false;
 	Hashtable<String, Object> hashIp = new Hashtable<String, Object>(1000, 0.5F);
         Hashtable<String, Object> hashIpUrl = new Hashtable<String, Object>(1000, 0.5F);
-	HashMap<String, Integer> ipWhitelist = new HashMap<String, Integer>(); 
+        Hashtable<String, Object> hashIpUserAgent = new Hashtable<String, Object>(10, 0.5F);
+	HashMap<String, Integer> ipWhitelist = new HashMap<String, Integer>();
+	public static int count(String text,String sub){  
+		int count =0, start =0;  
+		while((start=text.indexOf(sub,start))>=0){  
+		    start += sub.length();  
+		    count ++;  
+		}  
+		return count;  
+	}  
+	  
+	public static int total(String text, String[] sqlxssChar, String[] sqlxssArr){  
+		int x=0, y=0, n=0, m=0;  
+		Integer count_char = sqlxssChar.length;
+		Integer count_str = sqlxssArr.length;
+		for (n = 0; n < count_char; n++) {
+		        x = x + count(text, sqlxssChar[n]);
+		}
+		
+		for (m = 0; m < count_str; m++) {
+		        y = y + 10 * count(text, sqlxssArr[m]);
+		}
+		return x + y;  
+	}
+ 
 	public void  prepare(Map stormConf, TopologyContext context) {
    		topic = (String) stormConf.get("xlog.kafka.topic.name");
    		totalThreshold = Long.parseLong((String) stormConf.get("insert.into.mysql.min.total"), 10);
@@ -106,7 +136,11 @@ public  class XlogKafkaSpoutTopology {
    		mysqlUrl       = (String) stormConf.get("mysql.url");
    		mysqlUser      = (String) stormConf.get("mysql.user");
    		mysqlPassword  = (String) stormConf.get("mysql.password");
-		thisTaskId = context.getThisTaskId();
+		subcharArr     = StringUtils.split((String) stormConf.get("xlog.sqlxss.char"), ",");
+		substrArr      = StringUtils.split((String) stormConf.get("xlog.sqlxss.string"), ",");
+		String enable  = (String) stormConf.get("xlog.sqlxss.enable");
+		sqlxssEnable   = enable.toLowerCase().equals("true") ? true : false;	
+		thisTaskId     = context.getThisTaskId();
 	}
 
         @Override
@@ -122,10 +156,14 @@ public  class XlogKafkaSpoutTopology {
 		String datetime = "";
 		String method = "";
 		String url = "";
+		String decoudeUrl = "";
 		String code = "";
 		String size = "";
+		String userAgent = "";
+		String proxyIp = "-";
                 int re_time = 0;
                 int mm = 0;
+                int sqlxssTotal = 0;
 		boolean inWhitelist = false;
 	        Pattern pattern = Pattern.compile(regex);  
 	        Matcher matcher = pattern.matcher(line);  
@@ -137,6 +175,8 @@ public  class XlogKafkaSpoutTopology {
 	    		url = matcher.group(5);
 			code = matcher.group(7);
 			size = matcher.group(8);
+			userAgent = matcher.group(10);
+			proxyIp = matcher.group(11);
 	    		total ++;
 
 			//从日志标记提取时间
@@ -165,7 +205,7 @@ public  class XlogKafkaSpoutTopology {
                         }
 
 		        //已经在白名单的不再继续统计	
-			if (ip.equals('-')) {
+			if (ip.equals("-")) {
 				continue;
 			}
 
@@ -230,9 +270,26 @@ public  class XlogKafkaSpoutTopology {
 				 hashIp.remove(ip);
 				 continue;
 			}
-			
+		
+			//代理信息
+                        boolean userAgentMapIsExist = hashIpUserAgent.containsKey(ip);
+                        HashMap<String, Integer> mapUserAgent = null;
+                        mapUserAgent = userAgentMapIsExist ? (HashMap<String, Integer>) hashIpUserAgent.get(ip) : new HashMap<String, Integer>();
+			mapUserAgent.put(userAgent, 1);
+			hashIpUserAgent.put(ip, mapUserAgent);
+	
 			Integer codeFirst = Integer.parseInt(code.substring(0, 1));
 			String fieldName = "";
+
+			if (sqlxssEnable) {
+				try {  
+					decoudeUrl = java.net.URLDecoder.decode(url, "utf-8").toLowerCase();
+			    		sqlxssTotal = total(decoudeUrl, subcharArr, substrArr);
+				} catch (UnsupportedEncodingException e) {  
+                         		//e.printStackTrace();  
+                         		System.out.println("UnsupportedEncodingException:"+url);
+                                }  
+			}
 
 			if ( ipMapIsExist ) {
 				map.put("total", map.get("total") + 1);
@@ -258,6 +315,13 @@ public  class XlogKafkaSpoutTopology {
 						map.put(fieldName, map.get(fieldName) + 1);	
 					}
 				}			    			
+				if (!proxyIp.equals("-")) {
+					map.put("proxy", map.get("proxy") + 1);
+				}
+
+				if (sqlxssEnable) {
+					map.put("sqlxss", map.get("sqlxss") + sqlxssTotal);
+				}
 			} else {
 				map.put("total", 1);
 				if ( isStatic ) {
@@ -290,6 +354,17 @@ public  class XlogKafkaSpoutTopology {
 						map.put(fieldName, 0);	
 					}
 				}		
+				if (!proxyIp.equals("-")) {
+					map.put("proxy", 1);
+				} else {
+					map.put("proxy", 0);
+				}
+
+				if (sqlxssEnable) {
+                                        map.put("sqlxss", sqlxssTotal);
+                                } else {
+					map.put("sqlxss", 0);
+				}
 			}
 			
 			if ( !inWhitelist && ipMapIsExist && mapUrlSize + 1 >= scopeThreshold) {
@@ -315,15 +390,19 @@ public  class XlogKafkaSpoutTopology {
 			long totalIp = 0;
 			long valid = 0;
 			long scopeSize = 0;
+			long userAgentSize = 0;
 			for ( Iterator<String> it = hashIp.keySet().iterator(); it.hasNext(); )   { 
 	        		String   key   =   (String)it.next(); 
 	        		HashMap<String, Integer> value   =  (HashMap<String, Integer>)  hashIp.get(key);
 				HashMap<String, Integer> hashUrl = (HashMap<String, Integer>) hashIpUrl.get(key);
+				HashMap<String, String> hashUserAgent = (HashMap<String, String>) hashIpUserAgent.get(key);
 			    	totalIp = value.get("total");
 				scopeSize = hashUrl.size();
+				userAgentSize = hashUserAgent.size();
+				//System.out.println("proxy: " +value.get("proxy") + " -> " + userAgentSize);
 			    	if ( totalIp > totalThreshold && scopeSize < scopeThreshold ) {
 					valid++;
-			    		ipList.add("'"+topic+"','"+ key +"','"+start_datetime+"','"+re_time+"','"+value.get("total")+"','"+value.get("statics")+"','"+value.get("dynamics")+"','"+value.get("2xx")+"','"+value.get("3xx")+"','"+value.get("4xx")+"','"+value.get("5xx")+"','"+value.get("get")+"','"+value.get("post")+"','"+value.get("head")+"','"+value.get("other")+"','"+scopeSize+"'");
+			    		ipList.add("'"+topic+"','"+ key +"','"+start_datetime+"','"+re_time+"','"+value.get("total")+"','"+value.get("statics")+"','"+value.get("dynamics")+"','"+value.get("2xx")+"','"+value.get("3xx")+"','"+value.get("4xx")+"','"+value.get("5xx")+"','"+value.get("get")+"','"+value.get("post")+"','"+value.get("head")+"','"+value.get("other")+"','"+scopeSize+"','"+value.get("sqlxss")+"','"+userAgentSize+"','"+value.get("proxy")+"'");
 			    	}
 				value   = null;
 				hashUrl = null;
@@ -335,7 +414,7 @@ public  class XlogKafkaSpoutTopology {
 			 	Connection conn = DriverManager.getConnection(mysqlUrl, mysqlUser, mysqlPassword);
 			 	Statement stmt = conn.createStatement();//创建语句对象，用以执行sql语言
 			 	if ( valid > 0) {
-					String sql = "INSERT INTO  `ips` (`topic`,`ip` ,`time_start` ,`time_end` ,`total` ,`statics` ,`dynamics` ,`2xx` ,`3xx` ,`4xx` ,`5xx` ,`get` ,`post` ,`head` ,`other`, `scope`) VALUES (" + data + ");";
+					String sql = "INSERT INTO  `ips` (`topic`,`ip` ,`time_start` ,`time_end` ,`total` ,`statics` ,`dynamics` ,`2xx` ,`3xx` ,`4xx` ,`5xx` ,`get` ,`post` ,`head` ,`other`, `scope`, `sqlxss`, `useragent`, `proxy`) VALUES (" + data + ");";
 		            		//System.out.println(sql);
 			 		stmt.execute(sql);
 					data = "";
@@ -349,6 +428,7 @@ public  class XlogKafkaSpoutTopology {
                         total = 0;statics = 0;dynamics = 0;
                         hashIp = new Hashtable<String, Object>(1000, 0.5F);
 			hashIpUrl = new Hashtable<String, Object>(1000, 0.5F);
+			hashIpUserAgent = new Hashtable<String, Object>(10, 0.5F);
 			ipWhitelist = new HashMap<String, Integer>();
                         isStatic = true;
                         start_datetime = 0;
@@ -369,9 +449,9 @@ public  class XlogKafkaSpoutTopology {
         SpoutConfig kafkaConfig = new SpoutConfig(brokerHosts, topic, "", "xlog_"+topic);
         kafkaConfig.scheme = new SchemeAsMultiScheme(new StringScheme());
         TopologyBuilder builder = new TopologyBuilder();
-        builder.setSpout("KafkaSpout", new KafkaSpout(kafkaConfig), 2).setNumTasks(10);
-        builder.setBolt("SplitBolt", new SplitSentence(), 1).setNumTasks(10).shuffleGrouping("KafkaSpout");
-        builder.setBolt("XlogBolt", new XlogBolt(), 4).setNumTasks(10).fieldsGrouping("SplitBolt", new Fields("ip"));
+        builder.setSpout("KafkaSpout", new KafkaSpout(kafkaConfig), 2).setNumTasks(8);
+        builder.setBolt("SplitBolt", new SplitSentence(), 1).setNumTasks(2).shuffleGrouping("KafkaSpout");
+        builder.setBolt("XlogBolt", new XlogBolt(), 4).setNumTasks(8).fieldsGrouping("SplitBolt", new Fields("ip"));
         return builder.createTopology();
     }
 
@@ -382,7 +462,7 @@ public  class XlogKafkaSpoutTopology {
 	}
         File file = new File(args[0]);
 	if( !file.exists() ) {
-		System.out.println("configure file " + args[0] + "do not exist!");
+		System.out.println("configure file " + args[0] + "not exist!");
 		System.exit(0);
 		
 	}   
