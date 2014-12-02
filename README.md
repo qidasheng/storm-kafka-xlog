@@ -6,14 +6,14 @@ storm-kafka-xlog
 
 编译
 --------
-···
+···Bash
 mvn clean   
 ···
 
 
 包路径    
 --------
-···
+···Bash
 target/storm-xlog-2.0.0-jar-with-dependencies.jar  
 ···
 
@@ -24,7 +24,7 @@ target/storm-xlog-2.0.0-jar-with-dependencies.jar
 
 配置    
 --------
-···
+···Vim
 \#zookeeper.server地址，多个逗号分隔          
 xlog.zookeeper.server=10.19.1.16,10.19.1.17     
 \#storm nimbus host        
@@ -54,7 +54,7 @@ xlog.debug=false
 
 部署：提交任务到单机storm或者storm集群    
 --------
-···
+···Bash
 storm jar target/storm-xlog-version-jar-with-dependencies.jar  storm.xlog.XlogKafkaSpoutTopology xlog.properties   
 ···
 
