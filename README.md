@@ -25,29 +25,29 @@ target/storm-xlog-2.0.0-jar-with-dependencies.jar
 配置    
 --------
 ```Vim
-\#zookeeper.server地址，多个逗号分隔          
+#zookeeper.server地址，多个逗号分隔          
 xlog.zookeeper.server=10.19.1.16,10.19.1.17     
-\#storm nimbus host        
+#storm nimbus host        
 xlog.nimbus.host=10.19.1.18      
-\#kafka topic name         
+#kafka topic name         
 xlog.kafka.topic.name=test    
-\#mysql相关配置             
+#mysql相关配置             
 mysql.url=jdbc:mysql://10.19.1.19:3306/storm_xlog          
 mysql.user=xlog           
 mysql.password=123456      
-\#单个ip interval.time时间内至少请求超过多少次数才记录到mysql数据库             
+#单个ip interval.time时间内至少请求超过多少次数才记录到mysql数据库             
 insert.into.mysql.min.total=60      
-\#单个ip interval.time时间内请求广度小于多少的才记录到mysql数据库           
+#单个ip interval.time时间内请求广度小于多少的才记录到mysql数据库           
 insert.into.mysql.max.scope=15    
-\#统计周期      
+#统计周期      
 xlog.interval.time=60
-\#sql注入和跨站脚本检测黑名单字符         
+#sql注入和跨站脚本检测黑名单字符         
 xlog.sqlxss.char=',", ,(,),..,|,\,null    
-\#sql注入和跨站脚本检测黑名单字符串         
+#sql注入和跨站脚本检测黑名单字符串         
 xlog.sqlxss.string=select ,alert(,prompt(,select(,sleep(,<script,_wvs     
-\#是否开启sql注入和跨站脚本检测，对性能有影响，如果不需要建议不开启              
+#是否开启sql注入和跨站脚本检测，对性能有影响，如果不需要建议不开启              
 xlog.sqlxss.enable=false   
-\#是否开启storm的debug功能      
+#是否开启storm的debug功能      
 xlog.debug=false     
 ```
 
