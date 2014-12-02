@@ -24,7 +24,7 @@ target/storm-xlog-2.0.0-jar-with-dependencies.jar
 
 配置    
 --------
-```Bash
+```Vim
 \#zookeeper.server地址，多个逗号分隔          
 xlog.zookeeper.server=10.19.1.16,10.19.1.17     
 \#storm nimbus host        
