@@ -58,3 +58,11 @@ xlog.debug=false
 storm jar target/storm-xlog-version-jar-with-dependencies.jar  storm.xlog.XlogKafkaSpoutTopology xlog.properties   
 ```
 
+注意事项              
+--------
+确保web日志格式如下，以nginx为例        
+```Vim
+log_format  xlog  '$remote_addr $host $remote_user [$time_local] "$request" '
+              '$status $body_bytes_sent "$http_referer" '
+              '"$http_user_agent" "$http_x_forwarded_for" $upstream_response_time $request_time';
+```
