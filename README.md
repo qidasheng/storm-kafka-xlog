@@ -37,13 +37,15 @@ mysql.user=xlog
 mysql.password=123456      
 #单个ip interval.time时间内至少请求超过多少次数才记录到mysql数据库             
 insert.into.mysql.min.total=60      
+#单个ip interval.time时间内sqlxss可疑度超过多少才记录到mysql数据库                 
+insert.into.mysql.min.sqlxss=100      
 #单个ip interval.time时间内请求广度小于多少的才记录到mysql数据库           
 insert.into.mysql.max.scope=15    
 #统计周期      
 xlog.interval.time=60
-#sql注入和跨站脚本检测黑名单字符         
+#sql注入和跨站脚本检测黑名单字符(发现一个sqlxss加1)         
 xlog.sqlxss.char=',", ,(,),..,|,\,null    
-#sql注入和跨站脚本检测黑名单字符串         
+#sql注入和跨站脚本检测黑名单字符串(发现一个sqlxss加10)              
 xlog.sqlxss.string=select ,alert(,prompt(,select(,sleep(,<script,_wvs     
 #是否开启sql注入和跨站脚本检测，对性能有影响，如果不需要建议不开启              
 xlog.sqlxss.enable=false   

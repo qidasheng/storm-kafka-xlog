@@ -88,6 +88,7 @@ public  class XlogKafkaSpoutTopology {
     public static class XlogBolt extends BaseBasicBolt {
     	private long intervalTime = 60;
     	private long totalThreshold = 30;
+    	private long sqlxssThreshold = 100;
 	private long scopeThreshold = 10;
     	private String topic = "";
     	private String mysqlUrl = "";
@@ -131,6 +132,7 @@ public  class XlogKafkaSpoutTopology {
 	public void  prepare(Map stormConf, TopologyContext context) {
    		topic = (String) stormConf.get("xlog.kafka.topic.name");
    		totalThreshold = Long.parseLong((String) stormConf.get("insert.into.mysql.min.total"), 10);
+   	       sqlxssThreshold = Long.parseLong((String) stormConf.get("insert.into.mysql.min.sqlxss"), 10);
    		scopeThreshold = Long.parseLong((String) stormConf.get("insert.into.mysql.max.scope"), 10);
    	        intervalTime   = Long.parseLong((String) stormConf.get("xlog.interval.time"), 10);
    		mysqlUrl       = (String) stormConf.get("mysql.url");
@@ -283,7 +285,7 @@ public  class XlogKafkaSpoutTopology {
 
 			if (sqlxssEnable) {
 				try {  
-					decoudeUrl = java.net.URLDecoder.decode(url, "utf-8").toLowerCase();
+					decoudeUrl = java.net.URLDecoder.decode(url.replaceAll("%", "%25"), "utf-8").toLowerCase();
 			    		sqlxssTotal = total(decoudeUrl, subcharArr, substrArr);
 				} catch (UnsupportedEncodingException e) {  
                          		//e.printStackTrace();  
@@ -388,6 +390,7 @@ public  class XlogKafkaSpoutTopology {
 		        String data = "";
 			ArrayList ipList = new ArrayList();
 			long totalIp = 0;
+			long totalSqlxss = 0;
 			long valid = 0;
 			long scopeSize = 0;
 			long userAgentSize = 0;
@@ -397,12 +400,13 @@ public  class XlogKafkaSpoutTopology {
 				HashMap<String, Integer> hashUrl = (HashMap<String, Integer>) hashIpUrl.get(key);
 				HashMap<String, String> hashUserAgent = (HashMap<String, String>) hashIpUserAgent.get(key);
 			    	totalIp = value.get("total");
+			    	totalSqlxss = value.get("sqlxss");
 				scopeSize = hashUrl.size();
 				userAgentSize = hashUserAgent.size();
 				//System.out.println("proxy: " +value.get("proxy") + " -> " + userAgentSize);
-			    	if ( totalIp > totalThreshold && scopeSize < scopeThreshold ) {
+			    	if ( (totalIp > totalThreshold && scopeSize < scopeThreshold) || totalSqlxss > sqlxssThreshold ) {
 					valid++;
-			    		ipList.add("'"+topic+"','"+ key +"','"+start_datetime+"','"+re_time+"','"+value.get("total")+"','"+value.get("statics")+"','"+value.get("dynamics")+"','"+value.get("2xx")+"','"+value.get("3xx")+"','"+value.get("4xx")+"','"+value.get("5xx")+"','"+value.get("get")+"','"+value.get("post")+"','"+value.get("head")+"','"+value.get("other")+"','"+scopeSize+"','"+value.get("sqlxss")+"','"+userAgentSize+"','"+value.get("proxy")+"'");
+			    		ipList.add("'"+topic+"','"+ key +"','"+start_datetime+"','"+re_time+"','"+value.get("total")+"','"+value.get("statics")+"','"+value.get("dynamics")+"','"+value.get("2xx")+"','"+value.get("3xx")+"','"+value.get("4xx")+"','"+value.get("5xx")+"','"+value.get("get")+"','"+value.get("post")+"','"+value.get("head")+"','"+value.get("other")+"','"+scopeSize+"','"+totalSqlxss+"','"+userAgentSize+"','"+value.get("proxy")+"'");
 			    	}
 				value   = null;
 				hashUrl = null;
